@@ -12,6 +12,7 @@ const convertWeiToEther = (wei) => {
 describe("Reentrancy", () => {
   let deployer, user;
   let bank;
+  let attacker;
 
   beforeEach(async () => {
     let accounts = await ethers.getSigners();
@@ -20,6 +21,12 @@ describe("Reentrancy", () => {
 
     const Bank = await ethers.getContractFactory("Bank", deployer);
     bank = await Bank.deploy();
+
+    const Attacker = await ethers.getContractFactory("Attacker", accounts[2]);
+    attacker = await Attacker.deploy(
+      await bank.getAddress(),
+      await deployer.getAddress()
+    );
 
     await bank.connect(deployer).deposit({ value: convertEtherToWei("100") });
     await bank.connect(user).deposit({ value: convertEtherToWei("50") });
@@ -48,6 +55,16 @@ describe("Reentrancy", () => {
         previousDeployerAddressBalance
       );
       expect(userBalance).to.equal(convertEtherToWei("50"));
+    });
+
+    it("expect Bank contract is able to protect malicious users to drain the balance", async () => {
+      await expect(
+        attacker.connect(deployer).attack({ value: convertEtherToWei("10") })
+      ).to.reverted;
+
+      // expect(
+      //   await ethers.provider.getBalance(await bank.getAddress())
+      // ).to.equal(0);
     });
   });
 });
